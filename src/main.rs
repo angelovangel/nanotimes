@@ -130,7 +130,7 @@ fn main() {
         reader2.read(&mut record2).expect("Failed to parse fastq record!");
 
         }
-    eprintln!("{} out of {} reads filtered to {} minutes written to stdout", reads2, reads, filterminutes);
+    eprintln!("{}: {} out of {} reads filtered to {} minutes written to stdout", infile, reads2, reads, filterminutes);
     }
     
 }
