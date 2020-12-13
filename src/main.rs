@@ -114,8 +114,8 @@ fn main() {
         let desc = record2.desc().unwrap();
         let tstamp = re.find(desc)
             .expect("Could not find start time string!")
-            .as_str()
-            .to_owned();
+            .as_str();
+            //.to_owned();
 
         // parse the extracted string as DateTime to work on it later, put it in the vec
         // [11..] because the string is <start_time=2019-10-30T10:18:24Z>
@@ -123,6 +123,7 @@ fn main() {
         // <2019-10-30T10:18:24Z>
         let tstamp_rfc = DateTime::parse_from_rfc3339(&tstamp[11..]) 
             .expect("Failed to parse datetime!");
+            
         if tstamp_rfc < *min_timestamp + Duration::minutes(filterminutes) {
             writer.write_record(&mut record2).expect("Failed to write fastq record!");
             reads2 += 1;

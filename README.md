@@ -9,7 +9,7 @@ By reading the time stamps in the description field of the fastq file, it can be
 - get the start and end time of sequencing (min and max time stamp)
 - filter reads based on time (minutes)
 
-I have previously [written a solution]() for this using `R` and `seqkit`, but it turned out to be too slow (days!) for big ONT runs.
+I have previously [written a solution](https://github.com/angelovangel/etc/blob/master/bin/filter-times-ont-faster.R) for this using `R` and `seqkit`, but it turned out to be too slow (days!) for big ONT runs.
 
 ### Installation and usage
 
@@ -34,14 +34,14 @@ Try `./target/release/nanotimes --help`. Some usage examples:
 ./target/release/nanotimes --summary file.fastq
 
 # filter all reads that are 10 minutes after start (output is stdout)
-./target/release/nanotimes --filter 10 file.fastq > file-10min.fastq
+./target/release/nanotimes --filter 10 file.fastq > file-10-min.fastq
 
 # for several time points
 timepoints=(5 10 20 60 120)
 file=path/to/file.fastq
 
 for t in $timepoints; do
-    ./target/release/nanotimes --filter $t $file > $(basename $file .fastq)-$t.fastq;
+    ./target/release/nanotimes --filter $t $file > $(basename $file .fastq)-$t-min.fastq;
 done
 
 ```
