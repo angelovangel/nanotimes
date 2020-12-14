@@ -14,7 +14,7 @@ use chrono::{DateTime, Duration};
 fn main() {
     //println!("Hello, world!");
     let matches = App::new("nanotimes")
-        .version("0.1.0")
+        .version("0.2.0")
         .author("Angel Angelov <aangeloo@gmail.com>")
         .about("Work with time stamps of ONT fastq files")
 

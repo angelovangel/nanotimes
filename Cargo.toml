@@ -1,6 +1,6 @@
 [package]
 name = "nanotimes"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Angel Angelov <aangeloo@gmail.com>"]
 edition = "2018"
 
