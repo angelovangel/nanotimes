@@ -24,11 +24,16 @@ fn main() {
             .takes_value(false)
             .help("Print run duraion"))
 
-        .arg(Arg::with_name("filter")
-            .long("filter")
+        .arg(Arg::with_name("filter_start")
+            .long("filter_start")
             .takes_value(true)
-            .help("Filter reads with a timestamp up to <integer> minutes after start"))
-        
+            .help("Filter reads with a timestamp up to <integer> minutes AFTER START"))
+
+        .arg(Arg::with_name("filter_end")
+            .long("filter_end")
+            .takes_value(true)
+            .help("Filter reads with a timestamp up to <integer> minutes BEFORE END"))
+
         .arg(Arg::with_name("INPUT")
             .index(1)
             .required(true)
@@ -36,12 +41,13 @@ fn main() {
 
         .group(ArgGroup::with_name("group")
             .required(true)
-            .args(&["summary", "filter"])
+            .args(&["summary", "filter_start", "filter_end"])
         )
         
         .get_matches();
     // app main logic - make a vector with time stamps and work on it to find what is needed
     // then use it to filter out the respective records
+    // have to read the records two times
 
     // parse input file
     let infile = matches.value_of("INPUT").unwrap().to_string();
@@ -49,7 +55,7 @@ fn main() {
     // define reader and record
     let mut reader = fastq::Reader::new(get_fastq_reader(&infile));
     let mut record = fastq::Record::new();
-    let mut reads = 0;
+    let mut reads1 = 0;
     let mut reads2 = 0;
     
     // define RE
@@ -75,7 +81,7 @@ fn main() {
             .expect("Failed to parse datetime!");
         
         vec.push(tstamp_rfc);
-        reads += 1;
+        reads1 += 1;
 
         reader.read(&mut record).expect("Failed to parse fastq record!");
     }
@@ -84,23 +90,23 @@ fn main() {
     let max_timestamp = vec.iter().max().unwrap();
     let duration = max_timestamp.signed_duration_since(*min_timestamp);
     //println!("vec is: {:?}", &vec[1..10]);
+
+    // case summary
     if matches.is_present("summary") {
 
-        println!("Total reads:    {}", reads);
+        println!("Total reads:    {}", reads1);
         println!("Earliest time:  {}", min_timestamp);
         println!("Latest time:    {}", max_timestamp);
         println!("Duration [min]: {}", duration.num_minutes());
-        println!("Rate:           {} reads per minute", reads / duration.num_minutes());
+        println!("Rate:           {} reads per minute", reads1 / duration.num_minutes());
     
-    } else if matches.is_present("filter") {
+    // case filter start or filter end
+    } else if matches.is_present("filter_start") | matches.is_present("filter_end") {
     // parse argument value
 
-    let filterminutes = matches
-        .value_of("filter")
-        .unwrap()
-        .trim()
-        .parse::<i64>()
-        .expect("Failed to parse argument!");
+    
+
+    
 
     //second pass to filter reads based on min and max that were found in the first pass
     //
@@ -123,18 +129,43 @@ fn main() {
         // <2019-10-30T10:18:24Z>
         let tstamp_rfc = DateTime::parse_from_rfc3339(&tstamp[11..]) 
             .expect("Failed to parse datetime!");
-            
-        if tstamp_rfc < *min_timestamp + Duration::minutes(filterminutes) {
-            writer.write_record(&mut record2).expect("Failed to write fastq record!");
-            reads2 += 1;
+
+        // case filter_start
+        if matches.is_present("filter_start") {
+            let filterminutes_start = matches
+                    .value_of("filter_start")
+                    .unwrap()
+                    .trim()
+                    .parse::<i64>()
+                    .expect("Failed to parse argument!");
+
+            if tstamp_rfc < *min_timestamp + Duration::minutes(filterminutes_start) {
+                writer.write_record(&mut record2).expect("Failed to write fastq record!");
+                reads2 += 1;
+            }
+        // case filter end
+        } else if matches.is_present("filter_end") {
+            let filterminutes_end = matches
+                    .value_of("filter_end")
+                    .unwrap()
+                    .trim()
+                    .parse::<i64>()
+                    .expect("Failed to parse argument!");
+
+            if tstamp_rfc > *max_timestamp - Duration::minutes(filterminutes_end) {
+                writer.write_record(&mut record2).expect("Failed to write fastq record!");
+                reads2 += 1;
+            }
+
         }
+        
         reader2.read(&mut record2).expect("Failed to parse fastq record!");
 
         }
-    eprintln!("{}: {} out of {} reads filtered to {} minutes written to stdout", infile, reads2, reads, filterminutes);
-    }
+    eprintln!("{}: {} out of {} reads filtered", infile, reads2, reads1);
+    } // case filter start or filter end
     
-}
+} //main
 
 
 
