@@ -33,15 +33,18 @@ Try `./target/release/nanotimes --help`. Some usage examples:
 # get an impression about the time stamps
 ./target/release/nanotimes --summary file.fastq
 
-# filter all reads that are 10 minutes after start (output is stdout)
-./target/release/nanotimes --filter 10 file.fastq > file-10-min.fastq
+# filter all reads that are 10 minutes AFTER START (output is stdout)
+./target/release/nanotimes --filter_start 10 file.fastq > file-10-min.fastq
+
+# filter all reads that are 10 minutes BEFORE END (output is stdout)
+./target/release/nanotimes --filter_end 10 file.fastq > file-10-min.fastq
 
 # for several time points
 timepoints=(5 10 20 60 120)
 file=path/to/file.fastq
 
 for t in $timepoints; do
-    ./target/release/nanotimes --filter $t $file > $(basename $file .fastq)-$t-min.fastq;
+    ./target/release/nanotimes --filter_start $t $file > $(basename $file .fastq)-$t-min.fastq;
 done
 
 ```
