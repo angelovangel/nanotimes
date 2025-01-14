@@ -8,6 +8,7 @@ use clap::{Arg, ArgGroup, App};
 //extern crate chrono;
 use chrono::{DateTime, Duration};
 
+use nanotimes::{self, write_fastq};
 fn main() {
     //println!("Hello, world!");
     let arg_matches = App::new("nanotimes")
@@ -139,10 +140,7 @@ fn main() {
                     .expect("Failed to parse argument!");
 
                 if tstamp_rfc < *min_timestamp + Duration::minutes(filterminutes_start) {
-                    println!("{}", "@".to_string() + record2.head());
-                    println!("{}", record2.seq());
-                    println!("{}", "+");
-                    println!("{}", record2.qual());
+                    write_fastq(record2);
                     reads2 += 1;
                 }
             
@@ -155,10 +153,7 @@ fn main() {
                     .expect("Failed to parse argument!");
 
                 if tstamp_rfc > *max_timestamp - Duration::minutes(filterminutes_end) {
-                    println!("{}", "@".to_string() + record2.head());
-                    println!("{}", record2.seq());
-                    println!("{}", "+");
-                    println!("{}", record2.qual());
+                    write_fastq(record2);
                     reads2 += 1;
                 }
                 
