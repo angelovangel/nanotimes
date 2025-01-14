@@ -1,8 +1,5 @@
-// 
-use std::{io, io::BufReader,fs};
-use flate2::bufread;
-use bio::io::{fastq, fastq::FastqRead};
-use regex::Regex;
+use kseq::parse_path;
+use regex::{Regex, RegexSet};
 
 
 //extern crate clap;
@@ -13,7 +10,7 @@ use chrono::{DateTime, Duration};
 
 fn main() {
     //println!("Hello, world!");
-    let matches = App::new("nanotimes")
+    let arg_matches = App::new("nanotimes")
         .version("0.2.0")
         .author("Angel Angelov <aangeloo@gmail.com>")
         .about("Work with time stamps of ONT fastq files")
@@ -46,137 +43,127 @@ fn main() {
         
         .get_matches();
     // app main logic - make a vector with time stamps and work on it to find what is needed
-    // then use it to filter out the respective records
-    // have to read the records two times
+    // use it to filter out the respective records
 
-    // parse input file
-    let infile = matches.value_of("INPUT").unwrap().to_string();
+    let infile = arg_matches.value_of("INPUT").unwrap().to_string();
 
-    // define reader and record
-    let mut reader = fastq::Reader::new(get_fastq_reader(&infile));
-    let mut record = fastq::Record::new();
+    let mut records = parse_path(&infile).unwrap();
     let mut reads1 = 0;
     let mut reads2 = 0;
     
     // define RE
-    let re = Regex::new(r"start_time=\S*").unwrap(); // \S is "not white space"
+    let str1 = r"start_time=\S*";
+    let str2 = r"st:Z:\S*";
+    let re1 = Regex::new(str1).unwrap(); // \S is "not white space"
+    let re2 = Regex::new(str2).unwrap();
+    let regexset = RegexSet::new(&[ str1, str2 ]).unwrap();
     // vector to collect timestamps
     let mut vec = vec![];
-    
-    // read once, just to find minimum/maximum time stamps
-    reader.read(&mut record).expect("Failed to parse fastq record!");
-    while !record.is_empty() {
 
-        let desc = record.desc().unwrap();
-        let tstamp = re.find(desc)
-            .expect("Could not find start time string!")
-            .as_str();
-            //.to_owned();
+    while let Some(record) = records.iter_record().unwrap() {
+        let desc = record.des();
+        //println!("{}", desc);
+        let re_matches = regexset.matches(desc);
+
+        let tstamp = if re_matches.matched(0) {
+            re1.find(desc).expect("Could not find start time string!").as_str()
+        } else if re_matches.matched(1) {
+            re2.find(desc).expect("Could not find start time string!").as_str()
+        } else {
+            "No match"
+        };
+
+        let tstamp_index = if re_matches.matched(0) {
+            11
+        } else if re_matches.matched(1) {
+            5
+        } else {
+            0
+        };
 
         // parse the extracted string as DateTime to work on it later, put it in the vec
         // [11..] because the string is <start_time=2019-10-30T10:18:24Z>
         // and I need
         // <2019-10-30T10:18:24Z>
-        let tstamp_rfc = DateTime::parse_from_rfc3339(&tstamp[11..]) 
+        let tstamp_rfc = DateTime::parse_from_rfc3339(&tstamp[tstamp_index..]) 
             .expect("Failed to parse datetime!");
         
         vec.push(tstamp_rfc);
         reads1 += 1;
-
-        reader.read(&mut record).expect("Failed to parse fastq record!");
     }
 
+    // case summary
     let min_timestamp = vec.iter().min().unwrap();
     let max_timestamp = vec.iter().max().unwrap();
     let duration = max_timestamp.signed_duration_since(*min_timestamp);
-    //println!("vec is: {:?}", &vec[1..10]);
-
-    // case summary
-    if matches.is_present("summary") {
-
-        println!("Total reads:    {}", reads1);
-        println!("Earliest time:  {}", min_timestamp);
-        println!("Latest time:    {}", max_timestamp);
-        println!("Duration [min]: {}", duration.num_minutes());
-        println!("Rate:           {} reads per minute", reads1 / duration.num_minutes());
     
-    // case filter start or filter end
-    } else if matches.is_present("filter_start") | matches.is_present("filter_end") {
-    // parse argument value
+    if arg_matches.is_present("summary") {
+        eprintln!("Total reads:    {}", reads1);
+        eprintln!("Earliest time:  {}", min_timestamp);
+        eprintln!("Latest time:    {}", max_timestamp);
+        eprintln!("Duration [min]: {}", duration.num_minutes());
+        eprintln!("Rate:           {} reads per minute", reads1 / duration.num_minutes());
+    } else if arg_matches.is_present("filter_start") | arg_matches.is_present("filter_end") {
+        // second pass
+        let mut records2 = parse_path(&infile).unwrap();
+        while let Some(record2) = records2.iter_record().unwrap() {
+            let desc = record2.des();
+            let re_matches = regexset.matches(desc);
 
-    
+            let tstamp = if re_matches.matched(0) {
+                re1.find(desc).expect("Could not find start time string!").as_str()
+            } else if re_matches.matched(1) {
+                re2.find(desc).expect("Could not find start time string!").as_str()
+            } else {
+                "No match"
+            };
 
-    
-
-    //second pass to filter reads based on min and max that were found in the first pass
-    //
-    let mut reader2 = fastq::Reader::new(get_fastq_reader(&infile));
-    let mut record2 = fastq::Record::new();
-
-    reader2.read(&mut record2).expect("Failed to parse fastq record!");
-
-    while !record2.is_empty() {
-        let mut writer = fastq::Writer::new(io::stdout());
-        let desc = record2.desc().unwrap();
-        let tstamp = re.find(desc)
-            .expect("Could not find start time string!")
-            .as_str();
-            //.to_owned();
-
-        // parse the extracted string as DateTime to work on it later, put it in the vec
-        // [11..] because the string is <start_time=2019-10-30T10:18:24Z>
-        // and I need
-        // <2019-10-30T10:18:24Z>
-        let tstamp_rfc = DateTime::parse_from_rfc3339(&tstamp[11..]) 
+            let tstamp_index = if re_matches.matched(0) {
+                11
+            } else if re_matches.matched(1) {
+                5
+            } else {
+                0
+            };
+            
+            let tstamp_rfc = DateTime::parse_from_rfc3339(&tstamp[tstamp_index..]) 
             .expect("Failed to parse datetime!");
-
-        // case filter_start
-        if matches.is_present("filter_start") {
-            let filterminutes_start = matches
+            
+            // case filter_start
+            if arg_matches.is_present("filter_start") {
+                let filterminutes_start = arg_matches
                     .value_of("filter_start")
                     .unwrap()
                     .trim()
                     .parse::<i64>()
                     .expect("Failed to parse argument!");
 
-            if tstamp_rfc < *min_timestamp + Duration::minutes(filterminutes_start) {
-                writer.write_record(&mut record2).expect("Failed to write fastq record!");
-                reads2 += 1;
-            }
-        // case filter end
-        } else if matches.is_present("filter_end") {
-            let filterminutes_end = matches
+                if tstamp_rfc < *min_timestamp + Duration::minutes(filterminutes_start) {
+                    println!("{}", "@".to_string() + record2.head());
+                    println!("{}", record2.seq());
+                    println!("{}", "+");
+                    println!("{}", record2.qual());
+                    reads2 += 1;
+                }
+            
+            } else if arg_matches.is_present("filter_end") {
+                let filterminutes_end = arg_matches
                     .value_of("filter_end")
                     .unwrap()
                     .trim()
                     .parse::<i64>()
                     .expect("Failed to parse argument!");
 
-            if tstamp_rfc > *max_timestamp - Duration::minutes(filterminutes_end) {
-                writer.write_record(&mut record2).expect("Failed to write fastq record!");
-                reads2 += 1;
+                if tstamp_rfc > *max_timestamp - Duration::minutes(filterminutes_end) {
+                    println!("{}", "@".to_string() + record2.head());
+                    println!("{}", record2.seq());
+                    println!("{}", "+");
+                    println!("{}", record2.qual());
+                    reads2 += 1;
+                }
+                
             }
-
-        }
-        
-        reader2.read(&mut record2).expect("Failed to parse fastq record!");
-
-        }
-    eprintln!("{}: {} out of {} reads filtered", infile, reads2, reads1);
-    } // case filter start or filter end
-    
-} //main
-
-
-
-// fastq reader, file as arg, decide based on extension
-fn get_fastq_reader(path: &String) -> Box<dyn (::std::io::Read)> {
-    if path.ends_with(".gz") {
-        let f = fs::File::open(path).unwrap();
-        Box::new(bufread::MultiGzDecoder::new(BufReader::new(f)))
-    } else {
-        let f = fs::File::open(path).unwrap();
-        Box::new(BufReader::new(f))
-        //Box::new(fs::File::open(path).unwrap())
     }
-}
+    eprintln!("{} out of {} reads filtered ({:.2} %)", reads2, reads1, reads2 as f64 /reads1 as f64 *100.0);
+    } 
+}//main
